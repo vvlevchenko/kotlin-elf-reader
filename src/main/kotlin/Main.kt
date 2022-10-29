@@ -43,9 +43,9 @@ class ElfHeaderLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteB
                     elfHeader[3] == 'F'.code.toByte()
                 ) {
                     byteBuffer.position(0)
-                    return@use when (elfHeader[ElfHeaderLoader.BitnessHeaderOffsets.BITNESS_32.bitnessOffset].toInt()) {
-                        1 -> ElfHeaderLoader(ElfHeaderLoader.BitnessHeaderOffsets.BITNESS_32, byteBuffer)
-                        2 -> ElfHeaderLoader(ElfHeaderLoader.BitnessHeaderOffsets.BITNESS_64, byteBuffer)
+                    return@use when (elfHeader[BitnessHeaderOffsets.BITNESS_32.bitnessOffset].toInt()) {
+                        1 -> ElfHeaderLoader(BitnessHeaderOffsets.BITNESS_32, byteBuffer)
+                        2 -> ElfHeaderLoader(BitnessHeaderOffsets.BITNESS_64, byteBuffer)
                         else -> TODO()
                     }
                 }
@@ -120,11 +120,11 @@ class ElfHeaderLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteB
         return ByteArray(8).let {
             buffer.atOffset(offset) {
                 buffer.get(it)
-                var offset = 0UL
+                var value = 0UL
                 for (i in 0 until 8) {
-                    offset = offset.or(it[i].toUByte().toULong().shl(i * 8))
+                    value = value.or(it[i].toUByte().toULong().shl(i * 8))
                 }
-                offset
+                value
             }
         }
     }
@@ -143,8 +143,7 @@ class ElfHeaderLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteB
     fun section(index: Int): ElfSectionHeader {
         val offset = sectionHeaderOffset + (sectionHeaderEntrySize * index).toUInt()
         val typeOffset = offset + 4u;
-        val type = readUInt(typeOffset)
-        return when(type) {
+        return when(readUInt(typeOffset)) {
             1u -> ElfProgBitsSectionHeader(offset)
             3u -> ElfStrTabSection(offset)
             else -> ElfSectionHeader(offset)
