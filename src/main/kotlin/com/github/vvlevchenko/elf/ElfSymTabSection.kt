@@ -55,6 +55,7 @@ class ElfSymTabSection(loader: ElfLoader, offset: ULong) : ElfSectionHeader(load
  * } Elf64_Sym;
  */
 
+data class SymbolTypeAndBind(val type: UByte, val bind: UByte)
 class ElfSym(private val loader: ElfLoader, private val offset: ULong) {
     fun name() = loader.readUInt(offset)
     fun value() = when(loader.bitness) {
@@ -65,14 +66,19 @@ class ElfSym(private val loader: ElfLoader, private val offset: ULong) {
         BITNESS_32 -> loader.readUInt(offset + 8u).toULong()
         BITNESS_64 -> loader.readULong(offset + 16u)
     }
-    fun info() = when(loader.bitness) {
-        BITNESS_32 -> loader.readUByte(offset + 12u)
-        BITNESS_64 -> loader.readUByte(offset + 4u)
+    fun info(): SymbolTypeAndBind {
+        val value = when (loader.bitness) {
+            BITNESS_32 -> loader.readUByte(offset + 12u)
+            BITNESS_64 -> loader.readUByte(offset + 4u)
+        }
+        return SymbolTypeAndBind(value.toInt().and(0xf).toUByte(),
+            value.toInt().shr(4).toUByte())
     }
     fun other() = when(loader.bitness) {
         BITNESS_32 -> loader.readUByte(offset + 13u)
         BITNESS_64 -> loader.readUByte(offset + 5u)
     }
+    fun visibility() = other().toInt().and(0x3).toUByte()
     fun shindx() = when(loader.bitness) {
         BITNESS_32 -> loader.readShort(offset + 14u)
         BITNESS_64 -> loader.readShort(offset + 6u)
