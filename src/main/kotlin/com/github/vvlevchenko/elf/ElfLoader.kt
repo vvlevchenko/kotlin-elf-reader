@@ -1,5 +1,7 @@
 package com.github.vvlevchenko.elf
 
+import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.shtProgBits
+import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.shtStrTab
 import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -122,8 +124,8 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         val offset = sectionHeaderOffset + (sectionHeaderEntrySize * index).toUInt()
         val typeOffset = offset + 4u;
         return when(readUInt(typeOffset)) {
-            1u -> ElfProgBitsSectionHeader(this, offset)
-            3u -> ElfStrTabSection(this,offset)
+            shtProgBits.type -> ElfProgBitsSectionHeader(this, offset)
+            shtStrTab.type -> ElfStrTabSection(this,offset)
             else -> ElfSectionHeader(this, offset)
 
         }
