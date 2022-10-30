@@ -1,7 +1,6 @@
 package com.github.vvlevchenko.elf
 
-import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.shtProgBits
-import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.shtStrTab
+import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.*
 import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -74,6 +73,11 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         section(sectionHeaderStringIndex.toInt()) as ElfStrTabSection
     }
 
+    fun readUByte(offset: ULong): UByte {
+        return buffer.atOffset(offset) {
+            buffer.get().toUByte()
+        }
+    }
     fun readShort(offset: ULong): Short {
         return ByteArray(2).let {
             buffer.atOffset(offset) {
@@ -113,7 +117,7 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         val sectionNumber = readShort(bitness.sectionHeaderNumber.toULong())
         for (i in 0 until sectionNumber) {
             val section = section(i)
-            if (sectionHeaderStringTable.readString(section.nameIndex.toInt()) == sectionName) {
+            if (sectionHeaderStringTable.string(section.nameIndex.toInt()) == sectionName) {
                 return section
             }
         }
@@ -124,7 +128,8 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         val offset = sectionHeaderOffset + (sectionHeaderEntrySize * index).toUInt()
         val typeOffset = offset + 4u;
         return when(readUInt(typeOffset)) {
-            shtProgBits.type -> ElfProgBitsSectionHeader(this, offset)
+            shtProgBits.type -> ElfProgBitsSection(this, offset)
+            shtSymTab.type -> ElfSymTabSection(this, offset)
             shtStrTab.type -> ElfStrTabSection(this,offset)
             else -> ElfSectionHeader(this, offset)
 

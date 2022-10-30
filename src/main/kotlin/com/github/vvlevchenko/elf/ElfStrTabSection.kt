@@ -1,11 +1,13 @@
 package com.github.vvlevchenko.elf
 
+import com.github.vvlevchenko.elf.ElfSectionHeader.SectionType.shtStrTab
+
 class ElfStrTabSection (loader: ElfLoader, offset: ULong) : ElfSectionHeader(loader, offset) {
     constructor(loader: ElfLoader, header: ElfSectionHeader) : this(loader, header.offset) {
-        if (header !is ElfProgBitsSectionHeader && type != 0x3.toUInt())
-            throw IllegalStateException("$type isn't string tab 0x3")
+        if (header !is ElfProgBitsSection && type != shtStrTab.type)
+            throw IllegalStateException("$type isn't string tab ${shtStrTab.type}")
     }
-    fun readString(index : Int): String {
+    fun string(index : Int): String {
         return loader.buffer.atOffset((sectionOffset + index.toUInt())) {
             val bytes = mutableListOf<Byte>()
             var b: Byte
@@ -22,7 +24,7 @@ class ElfStrTabSection (loader: ElfLoader, offset: ULong) : ElfSectionHeader(loa
         val dump = mutableListOf<String>()
         var i = 0
         while (i < sectionSize.toInt()) {
-            val str = readString(i)
+            val str = string(i)
             if (str.isNotEmpty())
                 dump.add(str)
             i += str.length + 1
