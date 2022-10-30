@@ -3,7 +3,7 @@ import com.github.vvlevchenko.elf.ElfProgBitsSectionHeader
 import com.github.vvlevchenko.elf.ElfStrTabSection
 import java.io.File
 
-fun main(args: Array<String>) {
+fun main() {
     val file = File("javagdb")
     val loader = ElfLoader.elfLoader(file)
     loader?.section(".shstrtab")?.let {
@@ -24,5 +24,4 @@ fun main(args: Array<String>) {
             println(it)
         }
     }
-
 }
