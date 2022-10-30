@@ -1,6 +1,7 @@
 import com.github.vvlevchenko.elf.ElfLoader
-import com.github.vvlevchenko.elf.ElfProgBitsSectionHeader
+import com.github.vvlevchenko.elf.ElfProgBitsSection
 import com.github.vvlevchenko.elf.ElfStrTabSection
+import com.github.vvlevchenko.elf.ElfSymTabSection
 import java.io.File
 
 fun main() {
@@ -13,15 +14,26 @@ fun main() {
         }
     }
     loader?.section(".debug.svm.imagebuild.arguments")?.let {
-        val dump = ElfStrTabSection(loader,it as ElfProgBitsSectionHeader).dumpTable()
-        dump.forEach {
+        ElfStrTabSection(loader, it as ElfProgBitsSection).dumpTable().forEach {
             println(it)
         }
     }
     loader?.section(".debug.svm.imagebuild.java.properties")?.let {
-        val dump = ElfStrTabSection(loader,it as ElfProgBitsSectionHeader).dumpTable()
-        dump.forEach {
+        ElfStrTabSection(loader, it as ElfProgBitsSection).dumpTable().forEach {
             println(it)
+        }
+    }
+    val strSection = loader?.section(".strtab") as? ElfStrTabSection
+    strSection?.let {
+        it.dumpTable()?.forEach {
+            println(it)
+        }
+    }
+    loader?.section(".symtab")?.let {
+        for (i in 0 until (it.sectionSize/it.sectionEntrySize).toInt()) {
+            (it as? ElfSymTabSection)?.symbol(i)?.let {
+                println("${strSection?.string(it.name().toInt())}:...0x${it.value().toString(16)}")
+            }
         }
     }
 }

@@ -1,5 +1,8 @@
 package com.github.vvlevchenko.elf
 
+import com.github.vvlevchenko.elf.ElfLoader.BitnessHeaderOffsets.BITNESS_32
+import com.github.vvlevchenko.elf.ElfLoader.BitnessHeaderOffsets.BITNESS_64
+
 open class ElfSectionHeader(
     internal val loader:ElfLoader, val offset: ULong
 ) {
@@ -23,12 +26,17 @@ open class ElfSectionHeader(
     val nameIndex = loader.readUInt(offset)
     val type = loader.readUInt(offset + 4u)
     val sectionOffset = when(loader.bitness) {
-        ElfLoader.BitnessHeaderOffsets.BITNESS_32 -> loader.readUInt(offset + 16u).toULong()
-        ElfLoader.BitnessHeaderOffsets.BITNESS_64 -> loader.readULong(offset + 24u)
+        BITNESS_32 -> loader.readUInt(offset + 16u).toULong()
+        BITNESS_64 -> loader.readULong(offset + 24u)
     }
     val sectionSize = when(loader.bitness) {
-        ElfLoader.BitnessHeaderOffsets.BITNESS_32 -> loader.readUInt(offset + 20u).toULong()
-        ElfLoader.BitnessHeaderOffsets.BITNESS_64 -> loader.readULong(offset + 32u)
+        BITNESS_32 -> loader.readUInt(offset + 20u).toULong()
+        BITNESS_64 -> loader.readULong(offset + 32u)
+    }
+
+    val sectionEntrySize = when(loader.bitness) {
+        BITNESS_32 -> loader.readUInt(offset + 0x24u).toULong()
+        BITNESS_64 -> loader.readULong(offset + 0x38u)
     }
 }
 
