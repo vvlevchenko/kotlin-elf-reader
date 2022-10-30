@@ -24,15 +24,11 @@ fun main() {
         }
     }
     val strSection = loader?.section(".strtab") as? ElfStrTabSection
-    strSection?.let {
-        it.dumpTable()?.forEach {
-            println(it)
-        }
-    }
     loader?.section(".symtab")?.let {
         for (i in 0 until (it.sectionSize/it.sectionEntrySize).toInt()) {
-            (it as? ElfSymTabSection)?.symbol(i)?.let {
-                println("${strSection?.string(it.name().toInt())}:...0x${it.value().toString(16)}")
+            (it as? ElfSymTabSection)?.symbol(i)?.let { sym ->
+                val info = sym.info()
+                println("${info.bind}: ${strSection?.string(sym.name().toInt())}:${info.type}:${sym.visibility()}...0x${sym.value().toString(16)}")
             }
         }
     }
