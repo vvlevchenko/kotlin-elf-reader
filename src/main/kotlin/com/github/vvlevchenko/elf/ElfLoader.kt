@@ -8,6 +8,25 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 
+/**
+ * Elf32_Addr	4	4	Unsigned program address
+ * Elf32_Off	4	4	Unsigned file offset
+ * Elf32_Half	2	2	Unsigned medium integer
+ * Elf32_Word	4	4	Unsigned integer
+ * Elf32_Sword	4	4	Signed integer
+ * unsigned char	1	1	Unsigned small integer
+ *
+ * Name	Size	Alignment	Purpose
+ * Elf64_Addr	8	8	Unsigned program address
+ * Elf64_Off	8	8	Unsigned file offset
+ * Elf64_Half	2	2	Unsigned medium integer
+ * Elf64_Word	4	4	Unsigned integer
+ * Elf64_Sword	4	4	Signed integer
+ * Elf64_Xword	8	8	Unsigned long integer
+ * Elf64_Sxword	8	8	Signed long integer
+ * unsigned char	1	1	Unsigned small integer
+ */
+
 class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer) {
 
     companion object {
