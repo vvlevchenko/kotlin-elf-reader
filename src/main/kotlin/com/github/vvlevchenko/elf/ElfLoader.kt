@@ -88,7 +88,7 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
     private val sectionHeaderEntrySize = readShort(bitness.sectionHeaderEntrySize.toULong())
     private val sectionHeaderStringIndex = readShort(bitness.sectionHeaderStringIndex.toULong())
 
-    private val sectionHeaderStringTable by lazy {
+    val sectionHeaderStringTable by lazy {
         section(sectionHeaderStringIndex.toInt()) as ElfStrTabSection
     }
 
@@ -132,6 +132,21 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         }
     }
 
+    data class Sleb128Entry(val value: ULong, val size: UInt)
+    fun readSleb128(offset: ULong): Sleb128Entry {
+        return buffer.atOffset(offset) {
+            var result = 0UL
+            var size = 0U
+            var v = 0UL
+            do {
+                v = get().toUByte().toULong()
+                result = result.or(v.and(0x7fu).shl(7 * size.toInt()))
+                size += 1U
+            } while(v.and(0x80u) != 0UL)
+            Sleb128Entry(result, size)
+        }
+    }
+
     fun section(sectionName: String): ElfSectionHeader? {
         val sectionNumber = readShort(bitness.sectionHeaderNumber.toULong())
         for (i in 0 until sectionNumber) {
@@ -151,10 +166,8 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
             shtSymTab.type -> ElfSymTabSection(this, offset)
             shtStrTab.type -> ElfStrTabSection(this,offset)
             else -> ElfSectionHeader(this, offset)
-
         }
     }
-
 }
 
 internal inline fun <reified T> ByteBuffer.atOffset(offset: ULong, action: ByteBuffer.() -> T): T {
