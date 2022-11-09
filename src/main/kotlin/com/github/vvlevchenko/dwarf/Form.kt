@@ -28,6 +28,11 @@ enum class Form(val value: UShort, vararg val types: ElementType) {
     DW_FORM_sec_offset(0x17u, ElementType.LinePtr, ElementType.LocListPtr, ElementType.MacPtr, ElementType.RangeListPtr),
     DW_FORM_exprloc(0x18u, ElementType.ExprLoc),
     DW_FORM_flag_present(0x19u, ElementType.Flag),
-    DW_FORM_ref_sig8(0x20u, ElementType.Reference)
+    DW_FORM_ref_sig8(0x20u, ElementType.Reference),
+    // DWARF 5
+    DW_FORM_strx1(0x25u, ElementType.String),
+    DW_FORM_strx2(0x26u, ElementType.String),
+    DW_FORM_strx4(0x27u, ElementType.String),
+    DW_FORM_strx8(0x28u, ElementType.String)
 }
 internal val forms = EnumSet.allOf(Form::class.java)

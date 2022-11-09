@@ -9,37 +9,76 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
     val entries by lazy {
         entries()
     }
+
+    inline fun find(crossinline body: (DebugInfoEntry) -> Boolean ):DebugInfoEntry? {
+        entries.forEach {
+            if (body(it))
+                return it
+            it.children.forEach { child ->
+                if (body(child))
+                    return child
+            }
+        }
+        return null
+    }
+
     private fun entries(): List<DebugInfoEntry> {
         var offset = debugInfoSection.sectionOffset
         val debugInfoEntryEntries = mutableListOf <DebugInfoEntry> ()
         do {
             offset = CompilationUnitHeader(loader, offset).let { cu ->
-                val entries = debugAbbrevSection.entries(cu.debugAbbrevOffset, cu.next.toUInt())
+                //val entries = debugAbbrevSection.entries(cu.debugAbbrevOffset, cu.next.toUInt())
                 debugAbbrevSection.entry(cu.debugAbbrevOffset).let {
                     var off = cu.offset + cu.size
-                    do {
-                        val diaOffset = off
-                        val v = loader.readSleb128(off)
-                        val number = v.value
-                        off += v.size
-                        val attributes = mutableListOf<Value>()
-                        entries.find { it.number == number }?.let { abbrev ->
-                            val tag = abbrev.tag
-                            abbrev.encoding.forEach { (attribute, form) ->
-                                val attribute = readEntry(attribute, form, loader, off, cu)
-                                attributes.add(attribute)
-                                off += attribute.size
-                            }
-                            debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, attributes.toList()))
-                        }
-                    } while (off < offset + cu.next)
+                    entry(cu, off, debugInfoEntryEntries, offset)
                 }
                 offset + cu.next
             }
         } while((offset - debugInfoSection.sectionOffset) < debugInfoSection.sectionSize)
         return debugInfoEntryEntries.toList()
     }
-    private fun readEntry(
+
+    private fun entry(
+        cu: CompilationUnitHeader,
+        offsetFromDiaHeader: ULong,
+        debugInfoEntryEntries: MutableList<DebugInfoEntry>,
+        offsetToDiaHeader: ULong
+    ): ULong {
+        var off = offsetFromDiaHeader
+        do {
+            val diaOffset = off - debugInfoSection.sectionOffset
+            val v = loader.readSleb128(off)
+            val number = v.value
+            off += v.size
+            if (number == 0UL) {
+                off -= v.size
+                break
+            }
+            if (diaOffset == 0x19e294uL && number == 1uL) {
+                v.size + 0uL
+            }
+            val attributes = mutableListOf<Value>()
+            debugAbbrevSection.find(cu.debugAbbrevOffset, cu.next.toUInt()) {
+                it.number == number
+            }?.let { abbrev ->
+                val tag = abbrev.tag
+                abbrev.encoding.forEach { (attribute, form) ->
+                    val attribute = readAttributeEntry(attribute, form, loader, off, cu)
+                    attributes.add(attribute)
+                    off += attribute.size
+                }
+                val children = mutableListOf<DebugInfoEntry>()
+                if (abbrev.hasChildren && abbrev.child != null) {
+                    off += entry(cu, off, children, offsetToDiaHeader)
+                }
+                debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, attributes.toList(), children.toList()))
+            }
+                //?: TODO()
+        } while (off < offsetToDiaHeader + cu.unitLength)
+        return off
+    }
+
+    private fun readAttributeEntry(
         attribute: Attribute,
         form: Form,
         loader: ElfLoader,
@@ -48,21 +87,29 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
     ) = when (form) {
         Form.DW_FORM_flag -> FlagValue(attribute, off, loader.readUByte(off))
         Form.DW_FORM_ref1,
-        Form.DW_FORM_data1 -> DataValue(attribute, form, off, loader.readUByte(off))
+        Form.DW_FORM_data1,
+        Form.DW_FORM_strx1-> DataValue(attribute, form, off, loader.readUByte(off))
         Form.DW_FORM_ref2,
-        Form.DW_FORM_data2 -> DataValue(attribute, form, off, loader.readShort(off))
+        Form.DW_FORM_data2,
+        Form.DW_FORM_strx2-> DataValue(attribute, form, off, loader.readShort(off))
         Form.DW_FORM_ref4,
-        Form.DW_FORM_data4 -> DataValue(attribute, form, off, loader.readUInt(off))
+        Form.DW_FORM_data4,
+        Form.DW_FORM_strx4-> DataValue(attribute, form, off, loader.readUInt(off))
         Form.DW_FORM_ref8,
-        Form.DW_FORM_data8 -> DataValue(attribute, form, off, loader.readULong(off))
+        Form.DW_FORM_data8,
+        Form.DW_FORM_strx8-> DataValue(attribute, form, off, loader.readULong(off))
         Form.DW_FORM_udata,
         Form.DW_FORM_sdata -> LebDataValue(attribute, form, off, loader.readSleb128(off))
         Form.DW_FORM_strp,
         Form.DW_FORM_sec_offset,
-        Form.DW_FORM_addr,
         Form.DW_FORM_ref_addr -> when (cu.format) {
             DwarfEntry.Format.Dwarf32 -> Dwarf32Data(attribute, form, off, loader.readUInt(off))
             DwarfEntry.Format.Dwarf64 -> Dwarf64Data(attribute, form, off, loader.readULong(off))
+        }
+        Form.DW_FORM_addr -> when(cu.addressSize) {
+            4.toUByte() -> Dwarf32Data(attribute, form, off, loader.readUInt(off))
+            8.toUByte() -> Dwarf64Data(attribute, form, off, loader.readULong(off))
+            else -> TODO()
         }
         Form.DW_FORM_flag_present -> FlagValuePresent(attribute, off)
         Form.DW_FORM_exprloc -> {
@@ -88,13 +135,20 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
     }
 }
 
-class DebugInfoEntry(val diaOffset: ULong, val tag: Tag, val number: ULong, val attributes: List<Value>)
+class DebugInfoEntry(
+    val diaOffset: ULong,
+    val tag: Tag,
+    val number: ULong,
+    val attributes: List<Value>,
+    val children: List<DebugInfoEntry>
+)
 open class Value(val attribute: Attribute, val form: Form, val offset:ULong, open val size: UInt)
 class FlagValue(attribute: Attribute, offset: ULong, private val value: UByte): Value(attribute, Form.DW_FORM_flag, offset, 1u) {
     val isSet = value != 0.toUByte()
 }
 class FlagValuePresent(attribute: Attribute, offset: ULong): Value(attribute, Form.DW_FORM_flag_present, offset, 0u)
 class DataValue<T>(attribute: Attribute, form: Form, offset: ULong, val value:T) : Value(attribute, form, offset, sizeof(form))
+
 class LebDataValue(attribute: Attribute, form: Form, offset: ULong, rawValue: ElfLoader.Sleb128Entry):
     Value(attribute, form, offset, rawValue.size)  {
         val value = rawValue.value
