@@ -10,7 +10,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         entries()
     }
 
-    inline fun find(crossinline body: (DebugInfoEntry) -> Boolean ):DebugInfoEntry? {
+    inline fun find(crossinline body: (DebugInfoEntry) -> Boolean): DebugInfoEntry? {
         entries.forEach {
             if (body(it))
                 return it
@@ -21,6 +21,16 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         }
         return null
     }
+
+    /*inline fun filter(crossinline  body: (DebugInfoEntry) -> Boolean): List<DebugInfoEntry> {
+        val result = mutableListOf<DebugInfoEntry>()
+        entries.forEach {
+            if (body(it))
+                result.add(it)
+            it
+        }
+
+    }*/
 
     private fun entries(): List<DebugInfoEntry> {
         var offset = debugInfoSection.sectionOffset
@@ -73,7 +83,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
                 }
                 debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, attributes.toList(), children.toList()))
             }
-                //?: TODO()
+                ?: TODO()
         } while (off < offsetToDiaHeader + cu.unitLength)
         return off
     }
@@ -126,7 +136,8 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
             var size = 0u
             val raw = mutableListOf<UByte>()
             do {
-                raw.add(loader.readUByte(off + size))
+                v = loader.readUByte(off + size)
+                raw.add(v)
                 size++
             } while (v != 0.toUByte())
             StringData(attribute, form, off, raw.toUByteArray())
