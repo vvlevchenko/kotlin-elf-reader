@@ -1,8 +1,7 @@
+import com.github.vvlevchenko.dwarf.Attribute
 import com.github.vvlevchenko.dwarf.Form
-import com.github.vvlevchenko.dwarf.section.DebugAbbrevSection
-import com.github.vvlevchenko.dwarf.section.DebugInfoSection
-import com.github.vvlevchenko.dwarf.section.Dwarf32Data
-import com.github.vvlevchenko.dwarf.section.Dwarf64Data
+import com.github.vvlevchenko.dwarf.Tag
+import com.github.vvlevchenko.dwarf.section.*
 import com.github.vvlevchenko.elf.ElfLoader
 import com.github.vvlevchenko.elf.ElfProgBitsSection
 import com.github.vvlevchenko.elf.ElfStrTabSection
@@ -90,6 +89,21 @@ fun main() {
         }
     }
     println("dwarf(tags: $tagsCount, attributeCount: $attributeCount) load  $millis in millis")
+    var debugEntry: DebugInfoEntry? = null
+    val lookupMillis = measureTimeMillis {
+        debugEntry = debugInfoSectionSec.find {
+            it.tag == Tag.DW_TAG_class_type
+                && it.attributes.find { it.attribute == Attribute.DW_AT_name }?.let {
+                    val index = when (it) {
+                        is Dwarf32Data -> it.value.toInt()
+                        is Dwarf64Data -> it.value.toInt()
+                        else -> TODO()
+                     }
+                    debugStr?.string(index) == "java.lang.String"
+            } ?: false
+        }
+    }
+    println("java.lang.String(${lookupMillis}): ${debugEntry?.diaOffset?.toString(16)}")
     loader.section(".debug_types")?.let {
 
     }
