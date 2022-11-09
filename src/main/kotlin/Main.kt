@@ -1,10 +1,14 @@
+import com.github.vvlevchenko.dwarf.Form
 import com.github.vvlevchenko.dwarf.section.DebugAbbrevSection
 import com.github.vvlevchenko.dwarf.section.DebugInfoSection
+import com.github.vvlevchenko.dwarf.section.Dwarf32Data
+import com.github.vvlevchenko.dwarf.section.Dwarf64Data
 import com.github.vvlevchenko.elf.ElfLoader
 import com.github.vvlevchenko.elf.ElfProgBitsSection
 import com.github.vvlevchenko.elf.ElfStrTabSection
 import com.github.vvlevchenko.elf.ElfSymTabSection
 import java.io.File
+import java.lang.Exception
 import kotlin.system.measureTimeMillis
 
 fun main() {
@@ -22,6 +26,9 @@ fun main() {
         ElfStrTabSection(loader, it as ElfProgBitsSection).dumpTable().forEach {
             println(it)
         }
+    }
+    val debugStr = loader?.section(".debug_str")?.let {
+        ElfStrTabSection(loader, it)
     }
     val strSection = loader?.section(".strtab") as? ElfStrTabSection
     loader?.section(".symtab")?.let {
@@ -41,12 +48,44 @@ fun main() {
     var tagsCount = 0L
     var attributeCount = 0L
     val millis = measureTimeMillis {
-        debugInfoSectionSec.entries.forEach {
+        debugInfoSectionSec.entries.forEach { die ->
             tagsCount++
-            println("[${it.number}] tag: ${it.tag} ... ${it.diaOffset.toString(16)}")
-            it.attributes.forEach { attr ->
+            println("[${die.number}] tag: ${die.tag} ... ${(die.diaOffset).toString(16)}")
+            die.attributes.forEach { attr ->
                 attributeCount++
-                println("\t[${attr.attribute}] ... ${attr.offset.toString(16)}")
+                println("\t[${attr.attribute}]/${attr.form} ... ${attr.offset.toString(16)}")
+                when (attr.form) {
+                    Form.DW_FORM_sec_offset -> {
+                        val value = when (attr) {
+                            is Dwarf32Data -> attr.value.toULong()
+                            is Dwarf64Data -> attr.value
+                            else -> TODO()
+                        }
+                        println("\t\t${attr.attribute} ${value.toString(16)}")
+                    }
+                    Form.DW_FORM_strp -> {
+                        debugStr?.let {
+                            val off = when (attr) {
+                                is Dwarf64Data -> attr.value.toInt()
+                                is Dwarf32Data -> attr.value.toInt()
+                                else -> TODO()
+                            }
+                            println(
+                                "\t\t${off.toString(16)}: attribute: $attr/${
+                                    (attr as? Dwarf32Data)?.value?.mod(
+                                        debugStr.sectionSize
+                                    )?.toString(16)
+                                }"
+                            )
+                            try {
+                                println("\t\t${debugStr.string(off)}")
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                    else -> {}
+                }
             }
         }
     }
@@ -54,7 +93,7 @@ fun main() {
     loader.section(".debug_types")?.let {
 
     }
-    loader.section(".debug_str")?.let {
+    debugStr?.let {
         println("${loader.sectionHeaderStringTable.string(it.nameIndex.toInt())}: ${it.type}")
     }
 }
