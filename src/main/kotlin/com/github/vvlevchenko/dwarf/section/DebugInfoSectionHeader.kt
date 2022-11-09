@@ -22,15 +22,6 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         return null
     }
 
-    /*inline fun filter(crossinline  body: (DebugInfoEntry) -> Boolean): List<DebugInfoEntry> {
-        val result = mutableListOf<DebugInfoEntry>()
-        entries.forEach {
-            if (body(it))
-                result.add(it)
-            it
-        }
-
-    }*/
 
     private fun entries(): List<DebugInfoEntry> {
         var offset = debugInfoSection.sectionOffset
@@ -64,9 +55,6 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
                 off -= v.size
                 break
             }
-            if (diaOffset == 0x19e294uL && number == 1uL) {
-                v.size + 0uL
-            }
             val attributes = mutableListOf<Value>()
             debugAbbrevSection.find(cu.debugAbbrevOffset, cu.next.toUInt()) {
                 it.number == number
@@ -78,12 +66,11 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
                     off += attribute.size
                 }
                 val children = mutableListOf<DebugInfoEntry>()
-                if (abbrev.hasChildren && abbrev.child != null) {
+                if (abbrev.hasChildren) {
                     off += entry(cu, off, children, offsetToDiaHeader)
                 }
-                debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, attributes.toList(), children.toList()))
+                debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, abbrev, attributes.toList(), children.toList()))
             }
-                ?: TODO()
         } while (off < offsetToDiaHeader + cu.unitLength)
         return off
     }
@@ -150,6 +137,7 @@ class DebugInfoEntry(
     val diaOffset: ULong,
     val tag: Tag,
     val number: ULong,
+    val abbrev: DebugAbbrevEntry,
     val attributes: List<Value>,
     val children: List<DebugInfoEntry>
 )
