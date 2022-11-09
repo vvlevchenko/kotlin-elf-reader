@@ -16,8 +16,10 @@ class CompilationUnitHeader(loader: ElfLoader, offset: ULong) : DwarfEntry(loade
         }
     val addressSize: UByte
         get() = when(format) {
-            Format.Dwarf32 -> loader.readUByte(10u)
+            Format.Dwarf32 -> loader.readUByte(offset + 10u)
             Format.Dwarf64 -> loader.readUByte(offset + 22u)
+        }.also {
+            require(it == 4.toUByte() || it == 8.toUByte())
         }
     override val size: ULong
         get() = when(format) {
