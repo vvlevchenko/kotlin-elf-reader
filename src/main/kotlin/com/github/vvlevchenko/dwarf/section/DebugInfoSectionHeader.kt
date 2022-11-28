@@ -52,7 +52,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
             val number = v.value
             off += v.size
             if (number == 0UL) {
-                off -= v.size
+                //off -= v.size
                 break
             }
             val attributes = mutableListOf<Value>()
@@ -67,10 +67,10 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
                 }
                 val children = mutableListOf<DebugInfoEntry>()
                 if (abbrev.hasChildren) {
-                    off += entry(cu, off, children, offsetToDiaHeader)
+                    off = entry(cu, off, children, offsetToDiaHeader)
                 }
                 debugInfoEntryEntries.add(DebugInfoEntry(diaOffset, tag, number, abbrev, attributes.toList(), children.toList()))
-            }
+            } ?: TODO("$${diaOffset} number: $number")
         } while (off < offsetToDiaHeader + cu.unitLength)
         return off
     }
