@@ -94,6 +94,11 @@ fun main() {
         fields
         methods
     }
+
+    val debugLineSection = DebugLineSection(loader)
+    val header0 = debugLineSection.header(0x3c8UL)
+    val header1 = debugLineSection.header(0x107a5fUL)
+    assert(header0!!.commonHeader.version == 4.toUShort())
 }
 
 fun DebugInfoSection.findClassByName(name: String):DiClass? {
