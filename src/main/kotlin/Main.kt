@@ -96,11 +96,36 @@ fun main() {
     }
 
     val debugLineSection = DebugLineSection(loader)
+    val v = debugInfoSectionSec.findSourceFileByFileName(debugLineSection, "App.java")
     val header0 = debugLineSection.header(0x3c8UL)
     val header1 = debugLineSection.header(0x107a5fUL)
     assert(header0!!.commonHeader.version == 4.toUShort())
 }
 
+fun DebugInfoSection.findSourceFileByFileName(debugLineSection: DebugLineSection, path: String): List<LineEntry> {
+    val fileName = File(path).name
+    return entries.filter {
+        it.attributes.find { att ->
+            att.attribute == Attribute.DW_AT_name || return@find false
+            val index = when(att) {
+                is Dwarf32Data -> att.value.toInt()
+                is Dwarf64Data -> att.value.toInt()
+                else -> return@find false
+            }
+            debugStr(debugInfoSection.loader)?.string(index) == fileName
+        } != null
+    }.mapNotNull {
+        val att = it.attributes.find { it.attribute == Attribute.DW_AT_stmt_list }
+        when (att) {
+            is Dwarf32Data -> att.value.toULong()
+            is Dwarf64Data -> att.value
+            else -> null
+        }
+    }.fold(mutableListOf<LineEntry>()) { acc, it ->
+        debugLineSection.header(it)?.lineTable?.let { it1 -> acc.addAll(it1) }
+        acc
+    }.toList()
+}
 fun DebugInfoSection.findClassByName(name: String):DiClass? {
     val die = find { die ->
         die.tag == Tag.DW_TAG_class_type
