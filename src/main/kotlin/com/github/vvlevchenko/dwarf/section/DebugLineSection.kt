@@ -7,6 +7,7 @@ import com.github.vvlevchenko.dwarf.Form
 import com.github.vvlevchenko.dwarf.forms
 import com.github.vvlevchenko.dwarf.section.DWLineTableStandardOperations.DW_LNS_copy
 import com.github.vvlevchenko.elf.ElfLoader
+import java.util.EnumSet
 
 data class FileEntry(val fileName: String, val directoryIndex: ULong, val modificationTime: ULong, val sizeInBytes: ULong)
 data class LineEntry(val address: ULong, val fileName: FileEntry, val line: Int, val collumn: Int)
@@ -63,7 +64,7 @@ class DebugLineSection(val loader: ElfLoader) {
 
         // 3.
         val addressSizeV5 = if (commonDebugLineHeader.isDwarf5) {
-            readerHelper(off, loader::readShort, ::incOffBy1)
+            readerHelper(off, loader::readShort, ::incOffBy2)
         } else {
             0.toUShort()
         }
@@ -148,19 +149,23 @@ class DebugLineSection(val loader: ElfLoader) {
             }
             val stateMachine = LineNumberProgramStateMachine(defaultIsStmt != 0.toUByte(), fileNames.toList())
             while (true) {
-                if (stateMachine.isEndSequence)
+                //if (stateMachine.isEndSequence)
+                //    break
+                if (off >= offset + commonDebugLineHeader.unitLength.toUInt() + 4u)
                     break
-                if (off >= offset + commonDebugLineHeader.unitLength.toUInt())
-                    break
+                val logOff = off
                 val opcode = readerHelper(off, loader::readUByte, ::incOffBy1)
 
                 when (opcode.toInt()) {
                     0 -> {
                         val extendedOpcodeLength = readSleb128(off, ::incOffBySize)
                         val extendedOpcode = readerHelper(off, loader::readUByte, ::incOffBy1)
+                        println("${logOff.toString(16)} 0 ${extendedOperations.find { it.value == extendedOpcode.toInt() }}")
                         when (extendedOpcode.toInt()) {
                             DWLineTableExtendedOperations.DW_LNE_end_sequence.value -> {
                                 stateMachine.isEndSequence = true
+                                stateMachine.commit()
+                                stateMachine.reset()
                             }
 
                             DWLineTableExtendedOperations.DW_LNE_set_address.value -> {
@@ -173,7 +178,7 @@ class DebugLineSection(val loader: ElfLoader) {
                                     }
                                     else -> {
                                         // unknown bitness
-                                        off += extendedOpcodeLength
+                                        off += (extendedOpcodeLength - 1u)
                                     }
                                 }
                             }
@@ -194,13 +199,14 @@ class DebugLineSection(val loader: ElfLoader) {
                             }
                             else -> {
                                 // unknown extended opcode
-                                off += extendedOpcodeLength
+                                off += (extendedOpcodeLength - 1u)
                             }
                         }
                     }
 
                     in 1 until opcodeBase.toInt() -> {
-                        val argumentsCount = standardOpcodeLengths[opcode.toInt()].toInt()
+                        val argumentsCount = standardOpcodeLengths[opcode.toInt() - 1].toInt()
+                        println("${logOff.toString(16)} ${opcode.toString(16)} ${standardOperations.find { it.value == opcode.toInt() }} ($argumentsCount)")
                         when (opcode.toInt()) {
                             DW_LNS_copy.value -> { // DW_LNS_copy
 
@@ -242,7 +248,7 @@ class DebugLineSection(val loader: ElfLoader) {
                             }
 
                             DWLineTableStandardOperations.DW_LNS_fixed_advance_pc.value -> { // DW_LNS_fixed_advance_pc
-                                stateMachine.address += readSleb128(off, ::incOffBySize)
+                                stateMachine.address += readerHelper(off, loader::readShort, ::incOffBy2).toUInt()
                             }
 
                             DWLineTableStandardOperations.DW_LNS_set_prologue_end.value -> { // DW_LNS_set_prologue_end
@@ -267,6 +273,7 @@ class DebugLineSection(val loader: ElfLoader) {
                     }
 
                     else -> {
+                        println("${logOff.toString(16)} ${opcode.toString(16)}")
                         val adjustedOpcode = opcode - opcodeBase
                         val opcodeAdvance = adjustedOpcode/lineRange
                         stateMachine.address += minimumInstructionLenght * opcodeAdvance
@@ -357,6 +364,18 @@ class DebugLineSection(val loader: ElfLoader) {
         fun commit() {
             lineNumEntries.add(LineEntry(address, files[file - 1], line, column))
         }
+        fun reset () {
+            address= 0UL
+            opIndex = 0
+            file = 1
+            line = 1
+            column = 0
+            isBasicBlock = false
+            isPrologEnd = false
+            isEpilogueBegin = false
+            isa = 0u
+            discriminator = 0u
+        }
     }
 }
 
@@ -374,6 +393,7 @@ enum class DWLineTableStandardOperations(val value: Int) {
     DW_LNS_set_epilogue_begin(11),
     DW_LNS_set_isa(12),
 }
+val standardOperations = EnumSet.allOf(DWLineTableStandardOperations::class.java)
 
 enum class DWLineTableExtendedOperations(val value: Int) {
     DW_LNE_end_sequence(1),
@@ -381,6 +401,7 @@ enum class DWLineTableExtendedOperations(val value: Int) {
     DW_LNE_define_file(3),
     DW_LNE_set_discriminator(4)
 }
+val extendedOperations = EnumSet.allOf(DWLineTableExtendedOperations::class.java)
 
 
 

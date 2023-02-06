@@ -97,9 +97,9 @@ fun main() {
 
     val debugLineSection = DebugLineSection(loader)
     val v = debugInfoSectionSec.findSourceFileByFileName(debugLineSection, "App.java")
-    val header0 = debugLineSection.header(0x3c8UL)
-    val header1 = debugLineSection.header(0x107a5fUL)
-    assert(header0!!.commonHeader.version == 4.toUShort())
+    //val header0 = debugLineSection.header(0xbf1f4U)
+    val header1 = debugLineSection.header(0x4cec8U)
+    assert(header1!!.commonHeader.version == 4.toUShort())
 }
 
 fun DebugInfoSection.findSourceFileByFileName(debugLineSection: DebugLineSection, path: String): List<LineEntry> {
