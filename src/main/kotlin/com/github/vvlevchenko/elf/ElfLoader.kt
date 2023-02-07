@@ -132,8 +132,9 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
         }
     }
 
-    data class Sleb128Entry(val value: ULong, val size: UInt)
-    fun readSleb128(offset: ULong): Sleb128Entry {
+    data class Uleb128Entry(val value: ULong, val size: UInt)
+    data class Sleb128Entry(val value: Long, val size: UInt)
+    fun readUleb128(offset: ULong): Uleb128Entry {
         return buffer.atOffset(offset) {
             var result = 0UL
             var size = 0U
@@ -143,7 +144,25 @@ class ElfLoader(val bitness: BitnessHeaderOffsets, val buffer: MappedByteBuffer)
                 result = result.or(v.and(0x7fu).shl(7 * size.toInt()))
                 size += 1U
             } while(v.and(0x80u) != 0UL)
-            Sleb128Entry(result, size)
+            Uleb128Entry(result, size)
+        }
+    }
+    fun readSleb128(offset: ULong): Sleb128Entry {
+        return buffer.atOffset(offset) {
+            var result = 0L
+            var size = 0U
+            var v = 0L
+            var signBits = -1L
+            do {
+                v = get().toUByte().toLong()
+                result = result.or(v.and(0x7f).shl(7 * size.toInt()))
+                size++
+                signBits = signBits.shl(7)
+            } while(v.and(0x80) != 0L)
+            if (signBits.shr(1).and(result) != 0.toLong()) {
+                result = result.or(signBits)
+            }
+            return Sleb128Entry(result, size)
         }
     }
 
