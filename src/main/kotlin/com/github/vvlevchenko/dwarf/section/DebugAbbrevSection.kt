@@ -41,12 +41,12 @@ class DebugAbbrevSection(val section: ElfSectionHeader) {
     }
     fun entry(offset: ULong): DebugAbbrevEntry? {
         var off = section.sectionOffset + offset
-        var v = section.loader.readSleb128(off)
+        var v = section.loader.readUleb128(off)
         val number = v.value
             if (v.value == 0uL)
             return null
         off += v.size
-        v = section.loader.readSleb128(off)
+        v = section.loader.readUleb128(off)
         off += v.size
         val tag = tags.find { it.value == v.value.toUShort() } ?: TODO("TAG: ${v.value.toString(16)}")
         val hasChildren = section.loader.readUByte(off).toUInt() != 0u
@@ -55,19 +55,19 @@ class DebugAbbrevSection(val section: ElfSectionHeader) {
         var child: DebugAbbrevEntry? = null
         var sibling: DebugAbbrevEntry? = null
         while (true) {
-            v = section.loader.readSleb128(off)
+            v = section.loader.readUleb128(off)
             off += v.size
             if (v.value == 0uL) {
                 if (hasChildren) {
                     child = entry(off - section.sectionOffset)
-                    off += child?.size ?: section.loader.readSleb128(off).size.toULong()
+                    off += child?.size ?: section.loader.readUleb128(off).size.toULong()
                 }
                 sibling = entry(off - section.sectionOffset)
-                off += sibling?.size ?: section.loader.readSleb128(off).size.toULong()
+                off += sibling?.size ?: section.loader.readUleb128(off).size.toULong()
                 break
             }
             val attribute = attributes.find { it.value  == v.value.toUShort() } ?: TODO("[$number][$tag](${offset.toString(16)})Attribute:${v.value.toString(16)}")
-            v = section.loader.readSleb128(off)
+            v = section.loader.readUleb128(off)
             val type = forms.find { it.value == v.value.toUShort() } ?: TODO("[$number][$tag](${offset.toString(16)})FORM: ${v.value.toString(16)}")
             off += v.size
             entries.add(attribute to type)

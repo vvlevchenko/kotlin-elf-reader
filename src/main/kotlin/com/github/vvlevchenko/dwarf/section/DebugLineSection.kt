@@ -107,7 +107,7 @@ class DebugLineSection(val loader: ElfLoader) {
             val directoryEntryFormat =
                 (0 until directoryEntryFormatCount.toInt()).readSequenceOfPairs(off, ::incOffBySize)
             // 15.
-            val directoriesCount = loader.readSleb128(rawElfSection.sectionOffset + off)
+            val directoriesCount = loader.readUleb128(rawElfSection.sectionOffset + off)
             off += directoriesCount.size
             // 16.
             val directories = (0 until directoriesCount.size.toInt()).map {
@@ -120,7 +120,7 @@ class DebugLineSection(val loader: ElfLoader) {
                 (0 until fileNameEntryFormatCount.toInt()).readSleb128Array(offset, ::incOffBySize)
 
             // 19.
-            val fileNamesCount = loader.readSleb128(rawElfSection.sectionOffset + off)
+            val fileNamesCount = loader.readUleb128(rawElfSection.sectionOffset + off)
             off += fileNamesCount.size
         } else {
             val subdirectories = mutableListOf<String>().also {
@@ -140,9 +140,9 @@ class DebugLineSection(val loader: ElfLoader) {
                         break
                     }
                     val str = readString(v, off, ::incOffBy1)
-                    val directory = readSleb128(off, ::incOffBySize)
-                    val lastModification = readSleb128(off, ::incOffBySize)
-                    val fileSize = readSleb128(off, ::incOffBySize)
+                    val directory = readUleb128(off, ::incOffBySize)
+                    val lastModification = readUleb128(off, ::incOffBySize)
+                    val fileSize = readUleb128(off, ::incOffBySize)
                     it.add(FileEntry(str, directory, lastModification, fileSize))
                 }
 
@@ -158,13 +158,14 @@ class DebugLineSection(val loader: ElfLoader) {
 
                 when (opcode.toInt()) {
                     0 -> {
-                        val extendedOpcodeLength = readSleb128(off, ::incOffBySize)
+                        val extendedOpcodeLength = readUleb128(off, ::incOffBySize)
                         val extendedOpcode = readerHelper(off, loader::readUByte, ::incOffBy1)
-                        println("${logOff.toString(16)} 0 ${extendedOperations.find { it.value == extendedOpcode.toInt() }}")
+                        val msgExtendedOperation = "${logOff.toString(16)} 0 ${extendedOperations.find { it.value == extendedOpcode.toInt() }}"
                         when (extendedOpcode.toInt()) {
                             DWLineTableExtendedOperations.DW_LNE_end_sequence.value -> {
                                 stateMachine.isEndSequence = true
                                 stateMachine.commit()
+                                println("$msgExtendedOperation line=${stateMachine.line}")
                                 stateMachine.reset()
                             }
 
@@ -185,15 +186,15 @@ class DebugLineSection(val loader: ElfLoader) {
 
                             DWLineTableExtendedOperations.DW_LNE_define_file.value -> {
                                 val path = readString(null, off, ::incOffBy1)
-                                val includeDir = readSleb128(off, ::incOffBySize)
+                                val includeDir = readUleb128(off, ::incOffBySize)
                                 // last modification
-                                readSleb128(off, ::incOffBySize)
+                                readUleb128(off, ::incOffBySize)
                                 // file size
-                                readSleb128(off, ::incOffBySize)
+                                readUleb128(off, ::incOffBySize)
                             }
 
                             DWLineTableExtendedOperations.DW_LNE_set_discriminator.value -> {
-                                val argument = loader.readSleb128(rawElfSection.sectionOffset + off)
+                                val argument = loader.readUleb128(rawElfSection.sectionOffset + off)
                                 off += argument.size
                                 stateMachine.discriminator = argument.value.toUInt()
                             }
@@ -206,7 +207,7 @@ class DebugLineSection(val loader: ElfLoader) {
 
                     in 1 until opcodeBase.toInt() -> {
                         val argumentsCount = standardOpcodeLengths[opcode.toInt() - 1].toInt()
-                        println("${logOff.toString(16)} ${opcode.toString(16)} ${standardOperations.find { it.value == opcode.toInt() }} ($argumentsCount)")
+                        val msgStandardOperation = "${logOff.toString(16)} ${opcode.toString(16)} ${standardOperations.find { it.value == opcode.toInt() }} ($argumentsCount)"
                         when (opcode.toInt()) {
                             DW_LNS_copy.value -> { // DW_LNS_copy
 
@@ -216,23 +217,26 @@ class DebugLineSection(val loader: ElfLoader) {
                                 stateMachine.isPrologEnd = false
                                 assert(argumentsCount == 0)
                                 stateMachine.commit()
+                                println("$msgStandardOperation line: ${stateMachine.line}")
                             }
 
                             DWLineTableStandardOperations.DW_LNS_advance_pc.value -> { // DW_LNS_advance_pc
-                                val argument = readSleb128(off, ::incOffBySize)
+                                val argument = readUleb128(off, ::incOffBySize)
                                 stateMachine.address += (minimumInstructionLenght * argument)
                             }
 
                             DWLineTableStandardOperations.DW_LNS_advance_line.value -> { // DW_LNS_set_advance_line
-                                stateMachine.line += readSleb128(off, ::incOffBySize).toInt()
+                                val value = readSleb128(off, ::incOffBySize).toInt()
+                                stateMachine.line += value
+                                println("$msgStandardOperation ($value) line: ${stateMachine.line}")
                             }
 
                             DWLineTableStandardOperations.DW_LNS_set_file.value -> { // DW_LNS_set_file
-                                stateMachine.file = readSleb128(off, ::incOffBySize).toInt()
+                                stateMachine.file = readUleb128(off, ::incOffBySize).toInt()
                             }
 
                             DWLineTableStandardOperations.DW_LNS_set_column.value -> { // DW_LNS_set_column
-                                stateMachine.column = readSleb128(off, ::incOffBySize).toInt()
+                                stateMachine.column = readUleb128(off, ::incOffBySize).toInt()
                             }
 
                             DWLineTableStandardOperations.DW_LNS_negate_stmt.value -> { // DW_LNS_negate_stmt
@@ -260,20 +264,20 @@ class DebugLineSection(val loader: ElfLoader) {
                             }
 
                             DWLineTableStandardOperations.DW_LNS_set_isa.value -> { // DW_LNS_set_isa
-                                stateMachine.isa = readSleb128(off, ::incOffBySize).toUInt()
+                                stateMachine.isa = readUleb128(off, ::incOffBySize).toUInt()
                             }
 
                             else -> {
                                 // ignore unknown standard operand.
                                 (0 until standardOpcodeLengths[opcode.toInt()].toInt()).forEach {
-                                    readSleb128(off, ::incOffBySize)
+                                    readUleb128(off, ::incOffBySize)
                                 }
                             }
                         }
                     }
 
                     else -> {
-                        println("${logOff.toString(16)} ${opcode.toString(16)}")
+                        val msgSpecialOperation = "${logOff.toString(16)} ${opcode.toString(16)}"
                         val adjustedOpcode = opcode - opcodeBase
                         val opcodeAdvance = adjustedOpcode/lineRange
                         stateMachine.address += minimumInstructionLenght * opcodeAdvance
@@ -283,6 +287,7 @@ class DebugLineSection(val loader: ElfLoader) {
                         stateMachine.isEpilogueBegin = false
                         stateMachine.discriminator = 0u
                         stateMachine.commit()
+                        println("$msgSpecialOperation line: ${stateMachine.line}")
                     }
                 }
                 stateMachine.opIndex++
@@ -314,7 +319,7 @@ class DebugLineSection(val loader: ElfLoader) {
     private fun IntRange.readSleb128Array(offset: ULong, offsetIncrementer: (UInt) -> ULong): List<ULong> {
         var off = offset
         return map {
-            val v = loader.readSleb128(rawElfSection!!.sectionOffset + off)
+            val v = loader.readUleb128(rawElfSection!!.sectionOffset + off)
             off = offsetIncrementer(v.size)
             v.value
         }.toList()
@@ -323,11 +328,11 @@ class DebugLineSection(val loader: ElfLoader) {
     private fun IntRange.readSequenceOfPairs(offset: ULong, offsetAppender: (UInt) -> ULong): List<Pair<ULong, Form>> {
         var off = offset
         return map {
-            val first = loader.readSleb128(rawElfSection!!.sectionOffset + off)
+            val first = loader.readUleb128(rawElfSection!!.sectionOffset + off)
             off = offsetAppender(first.size)
-            val second = loader.readSleb128(rawElfSection.sectionOffset + off)
+            val second = loader.readUleb128(rawElfSection.sectionOffset + off)
             off = offsetAppender(second.size)
-            println(second.value.toString(16))
+            //println(second.value.toString(16))
             first.value to (forms.find { it.value == second.value.toUShort() } ?: Form.DW_FORM_null.also {
                 println("${first.value} to ${second.value.toString(16)}")
             }) //second.value
@@ -342,7 +347,13 @@ class DebugLineSection(val loader: ElfLoader) {
         return readFunction(rawElfSection!!.sectionOffset + off).also { offsetAppender() }
     }
 
-    private inline fun readSleb128(off: ULong, offsetAppender: (UInt) -> ULong):ULong {
+    private inline fun readUleb128(off: ULong, offsetAppender: (UInt) -> ULong):ULong {
+        val (value, size) = loader.readUleb128(rawElfSection!!.sectionOffset + off)
+        offsetAppender(size)
+        return value
+    }
+
+    private inline fun readSleb128(off: ULong, offsetAppender: (UInt) -> ULong):Long {
         val (value, size) = loader.readSleb128(rawElfSection!!.sectionOffset + off)
         offsetAppender(size)
         return value

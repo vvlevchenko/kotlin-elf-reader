@@ -46,10 +46,10 @@ fun main() {
     val millis = measureTimeMillis {
         debugInfoSectionSec.entries.forEach { die ->
             tagsCount++
-            println("[${die.number}] tag: ${die.tag} ... ${(die.diaOffset).toString(16)}")
+            //println("[${die.number}] tag: ${die.tag} ... ${(die.diaOffset).toString(16)}")
             die.attributes.forEach { attr ->
                 attributeCount++
-                println("\t[${attr.attribute}]/${attr.form} ... ${attr.offset.toString(16)}")
+                //println("\t[${attr.attribute}]/${attr.form} ... ${attr.offset.toString(16)}")
                 when (attr.form) {
                     Form.DW_FORM_sec_offset -> {
                         val value = when (attr) {
@@ -57,7 +57,7 @@ fun main() {
                             is Dwarf64Data -> attr.value
                             else -> TODO()
                         }
-                        println("\t\t${attr.attribute} ${value.toString(16)}")
+                        //println("\t\t${attr.attribute} ${value.toString(16)}")
                     }
                     Form.DW_FORM_strp -> {
                         debugStr?.let {
@@ -66,15 +66,15 @@ fun main() {
                                 is Dwarf32Data -> attr.value.toInt()
                                 else -> TODO()
                             }
-                            println(
-                                "\t\t${off.toString(16)}: attribute: $attr/${
-                                    (attr as? Dwarf32Data)?.value?.mod(
-                                        debugStr.sectionSize
-                                    )?.toString(16)
-                                }"
-                            )
+                            //println(
+                            //    "\t\t${off.toString(16)}: attribute: $attr/${
+                            //        (attr as? Dwarf32Data)?.value?.mod(
+                            //            debugStr.sectionSize
+                            //        )?.toString(16)
+                            //    }"
+                            //)
                             try {
-                                println("\t\t${debugStr.string(off)}")
+                                //println("\t\t${debugStr.string(off)}")
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -85,10 +85,10 @@ fun main() {
             }
         }
     }
-    println("dwarf(tags: $tagsCount, attributeCount: $attributeCount) load  $millis in millis")
+    //println("dwarf(tags: $tagsCount, attributeCount: $attributeCount) load  $millis in millis")
 
     val diClassEnum = debugInfoSectionSec.findClassByName("java.lang.Enum")
-    println("java.lang.Enum(${diClassEnum?.die?.diaOffset?.toString(16)}")
+    //println("java.lang.Enum(${diClassEnum?.die?.diaOffset?.toString(16)}")
     val diClassA = debugInfoSectionSec.findClassByName("javagdb.A")
     diClassA?.run {
         fields
@@ -96,7 +96,7 @@ fun main() {
     }
 
     val debugLineSection = DebugLineSection(loader)
-    val v = debugInfoSectionSec.findSourceFileByFileName(debugLineSection, "App.java")
+    //val v = debugInfoSectionSec.findSourceFileByFileName(debugLineSection, "App.java")
     //val header0 = debugLineSection.header(0xbf1f4U)
     val header1 = debugLineSection.header(0x4cec8U)
     assert(header1!!.commonHeader.version == 4.toUShort())

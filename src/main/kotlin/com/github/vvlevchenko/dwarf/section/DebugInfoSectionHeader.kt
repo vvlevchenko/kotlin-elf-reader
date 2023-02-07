@@ -48,7 +48,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         var off = offsetFromDiaHeader
         do {
             val diaOffset = off - debugInfoSection.sectionOffset
-            val v = loader.readSleb128(off)
+            val v = loader.readUleb128(off)
             val number = v.value
             off += v.size
             if (number == 0UL) {
@@ -96,7 +96,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         Form.DW_FORM_data8,
         Form.DW_FORM_strx8-> DataValue(attribute, form, off, loader.readULong(off))
         Form.DW_FORM_udata,
-        Form.DW_FORM_sdata -> LebDataValue(attribute, form, off, loader.readSleb128(off))
+        Form.DW_FORM_sdata -> LebDataValue(attribute, form, off, loader.readUleb128(off))
         Form.DW_FORM_strp,
         Form.DW_FORM_sec_offset,
         Form.DW_FORM_ref_addr -> when (cu.format) {
@@ -110,7 +110,7 @@ class DebugInfoSection(val debugInfoSection: ElfSectionHeader, val debugAbbrevSe
         }
         Form.DW_FORM_flag_present -> FlagValuePresent(attribute, off)
         Form.DW_FORM_exprloc -> {
-            val v = loader.readSleb128(off)
+            val v = loader.readUleb128(off)
             UByteArray(v.value.toInt()).let {
                 for(i in it.indices) {
                     it[i] = loader.readUByte(off)
@@ -148,7 +148,7 @@ class FlagValue(attribute: Attribute, offset: ULong, private val value: UByte): 
 class FlagValuePresent(attribute: Attribute, offset: ULong): Value(attribute, Form.DW_FORM_flag_present, offset, 0u)
 class DataValue<T>(attribute: Attribute, form: Form, offset: ULong, val value:T) : Value(attribute, form, offset, sizeof(form))
 
-class LebDataValue(attribute: Attribute, form: Form, offset: ULong, rawValue: ElfLoader.Sleb128Entry):
+class LebDataValue(attribute: Attribute, form: Form, offset: ULong, rawValue: ElfLoader.Uleb128Entry):
     Value(attribute, form, offset, rawValue.size)  {
         val value = rawValue.value
 }
